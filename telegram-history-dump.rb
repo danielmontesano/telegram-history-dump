@@ -11,6 +11,8 @@ require_relative 'formatters/lib/formatter_base'
 require_relative 'lib/cli_parser'
 require_relative 'lib/dump_progress'
 require_relative 'lib/util'
+require_relative 'formatters/lib/daily_file_formatter'
+
 
 Dir[File.dirname(__FILE__) + '/formatters/*.rb'].each do |file|
   require File.expand_path(file)
@@ -123,9 +125,11 @@ def process_media(dialog, msg)
         return
       end
     end
+    print msg
     filename = case
       when $config['copy_media']
-        filename = File.basename(response['result'])
+        date_str = Time.at(msg['date']).strftime('%Y-%m-%d_%H.%M.%S')
+        filename = '' + date_str + '_' + File.basename(response['result'])
         destination = File.join(get_media_dir(dialog), fix_media_ext(filename))
         FileUtils.cp(response['result'], destination)
         destination
@@ -140,6 +144,9 @@ def process_media(dialog, msg)
     msg['media']['file'] = filename if filename
   end
 end
+
+#date_str = Time.at(dialog['date']).strftime('[%s] ' % @options['media_date_format'])
+# name = date_str + dialog['print_name']
 
 # telegram-cli saves media files with weird nonstandard extensions sometimes,
 # so replace known cases of these with their canonical extensions

@@ -8,12 +8,10 @@
 
   # Array of user dialogs to backup
   backup_users: [
-
   ]
   
   # Array of group dialogs to backup
   backup_groups: [
-  
   ]
   
   # Array of broadcast channels to backup
@@ -28,14 +26,14 @@
   # To enable a formatter, uncomment it along with all of its options
   # If no formatters are enabled, only JSON files are produced
   formatters:
-  #  plaintext:
-  #    date_format: '%Y-%m-%d %H:%M:%S'
+    plaintext:
+      date_format: '%Y-%m-%d %H:%M:%S'
   #  bare:
   #  pisg:
-  #  html:
-  #    paginate: 1500 # messages per page
-  #    use_utc_time: false
-  #    timestamps_every: 50 # messages
+    html:
+      paginate: 1500 # messages per page
+      use_utc_time: false
+      timestamps_every: 1 # messages
 
   # Target directory for the backup files
   # It his is a relative path it will be relative to the script's directory
@@ -48,14 +46,14 @@
   # These will be recognized as documents instead
   # Stickers are also considered documents
   download_media:
-    photo: false
-    document: false
-    audio: false
-    video: false
-
+    photo: true
+    document: true
+    audio: true
+    video: true
+  media_date_format: '%Y-%m-%d_%H.%M.%S'
   # False to reference downloaded files in the telegram-cli cache
   # True to copy downloaded media to a dedicated directory per dialog
-  copy_media: false
+  copy_media: true
 
   # True to delete media files from telegram-cli cache right after downloading
   # Effectively turns copy_media into move_media
