@@ -11,8 +11,7 @@ require_relative 'formatters/lib/formatter_base'
 require_relative 'lib/cli_parser'
 require_relative 'lib/dump_progress'
 require_relative 'lib/util'
-require_relative 'formatters/lib/daily_file_formatter'
-
+require_relative 'lib/tg_def'
 
 Dir[File.dirname(__FILE__) + '/formatters/*.rb'].each do |file|
   require File.expand_path(file)
@@ -55,17 +54,39 @@ def dump_dialog(dialog)
   offset = 0
   keep_dumping = true
   while keep_dumping do
+    cur_offset = offset
     $log.info('Dumping "%s" (range %d-%d)' % [
                 dialog['print_name'],
-                offset + 1,
-                offset + $config['chunk_size']
+                cur_offset + 1,
+                cur_offset + $config['chunk_size']
               ])
     msg_chunk = nil
-    Timeout::timeout($config['chunk_timeout']) do
-      msg_chunk = exec_tg_command('history', dialog['print_name'],
-                                  $config['chunk_size'], offset)
+    retry_count = 0
+    while retry_count <= $config['chunk_retry'] do
+      begin
+        Timeout::timeout($config['chunk_timeout']) do
+          msg_chunk = exec_tg_command('history', dialog['print_name'],
+                                      $config['chunk_size'], cur_offset)
+        end
+        break
+      rescue Timeout::Error
+        if retry_count == $config['chunk_retry']
+          $log.error('Failed to fetch chunk of %d messages from offset %d '\
+                     'after retrying %d times. Dump of "%s" is incomplete.' % [
+                       $config['chunk_size'], cur_offset,
+                       retry_count, dialog['print_name']
+                     ])
+          msg_chunk = []
+          offset += $config['chunk_size']
+          break
+        end
+        $log.error('Timeout, retrying... (%d/%d)' % [
+          retry_count += 1, $config['chunk_retry']
+        ])
+      end
     end
     raise 'Expected array' unless msg_chunk.is_a?(Array)
+
     msg_chunk.reverse_each do |msg|
       dump_msg = true
       unless msg['id']
@@ -104,7 +125,8 @@ def dump_dialog(dialog)
         break
       end
     end
-    keep_dumping = false if msg_chunk.length < $config['chunk_size']
+
+    keep_dumping = false if offset < cur_offset + $config['chunk_size']
     sleep($config['chunk_delay']) if keep_dumping
   end
   state = $dumper.end_dialog(dialog) || {}
@@ -125,11 +147,9 @@ def process_media(dialog, msg)
         return
       end
     end
-    print msg
     filename = case
       when $config['copy_media']
-        date_str = Time.at(msg['date']).strftime('%Y-%m-%d_%H.%M.%S')
-        filename = '' + date_str + '_' + File.basename(response['result'])
+        filename = File.basename(response['result'])
         destination = File.join(get_media_dir(dialog), fix_media_ext(filename))
         FileUtils.cp(response['result'], destination)
         destination
@@ -145,9 +165,6 @@ def process_media(dialog, msg)
   end
 end
 
-#date_str = Time.at(dialog['date']).strftime('[%s] ' % @options['media_date_format'])
-# name = date_str + dialog['print_name']
-
 # telegram-cli saves media files with weird nonstandard extensions sometimes,
 # so replace known cases of these with their canonical extensions
 def fix_media_ext(filename)
@@ -157,12 +174,24 @@ def fix_media_ext(filename)
 end
 
 def backup_target?(dialog)
-  candidates = case dialog['type']
+  dialog_type = case
+    when dialog['type'] == 'channel' &&
+         (dialog['flags'] & TgDef::TGLCHF_MEGAGROUP) != 0
+      then 'supergroup'
+    else dialog['type']
+  end
+  candidates = case dialog_type
     when 'user' then $config['backup_users']
     when 'chat' then $config['backup_groups']
     when 'channel' then $config['backup_channels']
-    else return false
+    when 'supergroup' then $config['backup_supergroups']
+    else
+      $log.warn('Unknown type "%s" for dialog "%s"' % [
+        dialog_type, dialog['print_name']
+      ])
+      return false
   end
+
   return false unless candidates
   return true if candidates.empty?
   candidates.each do |candidate|
@@ -201,6 +230,14 @@ $config = YAML.load_file(
 )
 $log = Logger.new(STDOUT)
 
+unless cli_opts.userdir.nil? || cli_opts.userdir.empty?
+  $config['backup_dir'] = File.join($config['backup_dir'], cli_opts.userdir)
+end
+
+unless cli_opts.backlog_limit.nil? || cli_opts.backlog_limit < 0
+  $config['backlog_limit'] = cli_opts.backlog_limit
+end
+
 FileUtils.mkdir_p(get_backup_dir)
 
 $dumper = JsonDumper.new
@@ -238,9 +275,8 @@ end
 
 connect_socket
 
-dialogs = exec_tg_command('dialog_list')
-channels = $config['backup_channels'] ?
-  exec_tg_command('channel_list') : []
+dialogs = exec_tg_command('dialog_list', $config['maximum_dialogs'])
+channels = exec_tg_command('channel_list', $config['maximum_dialogs'])
 raise 'Expected array' unless dialogs.is_a?(Array) && channels.is_a?(Array)
 dialogs = dialogs.concat(channels)
 raise 'No dialogs found' if dialogs.empty?
@@ -248,7 +284,14 @@ backup_list = []
 skip_list = []
 dialogs.each do |dialog|
 
-  # Compatibility with upcoming tg version (1.4)
+  # Supergroups may have more than one list entry because they are included in
+  # both dialog_list and channel_list, so ignore duplicate IDs
+  next if backup_list.any? do |selected_dialog|
+    return false unless selected_dialog.include?('peer_id')
+    selected_dialog['peer_id'] == dialog['peer_id']
+  end
+
+  # Compatibility with latest tg (1.4+)
   dialog['id'] = dialog['peer_id'] if dialog.key?('peer_id')
   dialog['type'] = dialog['peer_type'] if dialog.key?('peer_type')
 
@@ -280,7 +323,7 @@ backup_list.each_with_index do |dialog,i|
     dump_dialog(dialog)
     save_progress
   rescue Timeout::Error
-    $log.error('Command timeout, skipping to next dialog')
+    $log.error('Unhandled timeout, skipping to next dialog')
     disconnect_socket
   end
 end

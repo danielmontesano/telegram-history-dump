@@ -2,22 +2,36 @@
 
   ## Backup targets ##
   #
+  # Array of strings for each category
   # Partial names are allowed, it doesn't have to be exact
-  # Empty array (the default) means "everything in this category"
-  # null or an array containing only null means "nothing in this category"
+  # An empty array means "everything in this category"
+  # An array containing only null means "nothing in this category"
 
   # Array of user dialogs to backup
   backup_users: [
+
   ]
-  
+
   # Array of group dialogs to backup
   backup_groups: [
+
   ]
-  
+
+  # Array of supergroup dialogs to backup
+  backup_supergroups: [
+    null
+  ]
+
   # Array of broadcast channels to backup
-  # Disabled by default because for the moment it will fail unless telegram-cli
-  # is built from their test branch (feature tested with tg revision c69f2a2)
-  backup_channels: null
+  # WARNING: using this can cause a crash when a channel has too many messages
+  # to fit in a single chunk (see https://github.com/vysheng/tg/issues/947)
+  backup_channels: [
+    null
+  ]
+
+  # By default telegram-cli returns only the first 100 dialogs/channels
+  # If you have more than 100 dialogs, increase this value
+  maximum_dialogs: 100
 
 
   ## Output options ##
@@ -25,18 +39,23 @@
   # Formatters export the JSON output to a different format
   # To enable a formatter, uncomment it along with all of its options
   # If no formatters are enabled, only JSON files are produced
-  formatters:
-    plaintext:
-      date_format: '%Y-%m-%d %H:%M:%S'
-  #  bare:
-  #  pisg:
-    html:
-      paginate: 1500 # messages per page
-      use_utc_time: false
-      timestamps_every: 1 # messages
+  formatters: {
+  #  plaintext: {
+  #    date_format: '%Y-%m-%d %H:%M:%S'
+  #  },
+  #  bare: {},
+  #  pisg: {},
+  #  html: {
+  #    paginate: 1500, # messages per page
+  #    use_utc_time: false,
+  #    timestamps_every: 50, # messages
+  #    loop_video: true, # loop and autoplay videos
+  #  },
+  }
 
   # Target directory for the backup files
-  # It his is a relative path it will be relative to the script's directory
+  # If this is a relative path it will be relative to the script's directory
+  # Absolute path starts with '/' or '~'
   backup_dir: './output'
 
   # Maximum number of messages to backup for each target (0 means unlimited)
@@ -45,15 +64,16 @@
   # At the time of writing, telegram-cli does not properly detect audio/video
   # These will be recognized as documents instead
   # Stickers are also considered documents
-  download_media:
-    photo: true
-    document: true
-    audio: true
-    video: true
-  media_date_format: '%Y-%m-%d_%H.%M.%S'
+  download_media: {
+    photo: false,
+    document: false,
+    audio: false,
+    video: false,
+  }
+
   # False to reference downloaded files in the telegram-cli cache
   # True to copy downloaded media to a dedicated directory per dialog
-  copy_media: true
+  copy_media: false
 
   # True to delete media files from telegram-cli cache right after downloading
   # Effectively turns copy_media into move_media
@@ -82,9 +102,12 @@
   # Time in seconds to wait before considering a request stuck (0 = infinite)
   chunk_timeout: 10
 
+  # Number of times to retry getting one chunk
+  chunk_retry: 3
+
   # Time in seconds to wait before considering a download stuck (0 = infinite)
-  # Beware: setting this nonzero may cause a dialog backup to be canceled
-  # because of a large media file
+  # This setting is not very useful at the moment, it just skips to the next
+  # dialog if downloading a media file takes too long
   media_timeout: 0
 
 
