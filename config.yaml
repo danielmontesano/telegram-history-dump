@@ -9,12 +9,12 @@
 
   # Array of user dialogs to backup
   backup_users: [
-
+Billy
   ]
 
   # Array of group dialogs to backup
   backup_groups: [
-
+null
   ]
 
   # Array of supergroup dialogs to backup
@@ -31,7 +31,7 @@
 
   # By default telegram-cli returns only the first 100 dialogs/channels
   # If you have more than 100 dialogs, increase this value
-  maximum_dialogs: 100
+  maximum_dialogs: 400
 
 
   ## Output options ##
@@ -40,17 +40,17 @@
   # To enable a formatter, uncomment it along with all of its options
   # If no formatters are enabled, only JSON files are produced
   formatters: {
-  #  plaintext: {
-  #    date_format: '%Y-%m-%d %H:%M:%S'
-  #  },
-  #  bare: {},
-  #  pisg: {},
-  #  html: {
-  #    paginate: 1500, # messages per page
-  #    use_utc_time: false,
-  #    timestamps_every: 50, # messages
-  #    loop_video: true, # loop and autoplay videos
-  #  },
+   plaintext: {
+     date_format: '%Y-%m-%d %H:%M:%S'
+   },
+   bare: {},
+   pisg: {},
+   html: {
+     paginate: 1500, # messages per page
+     use_utc_time: false,
+     timestamps_every: 1, # messages
+     loop_video: true, # loop and autoplay videos
+   },
   }
 
   # Target directory for the backup files
@@ -65,15 +65,15 @@
   # These will be recognized as documents instead
   # Stickers are also considered documents
   download_media: {
-    photo: false,
-    document: false,
-    audio: false,
-    video: false,
+    photo: true,
+    document: true,
+    audio: true,
+    video: true,
   }
 
   # False to reference downloaded files in the telegram-cli cache
   # True to copy downloaded media to a dedicated directory per dialog
-  copy_media: false
+  copy_media: true
 
   # True to delete media files from telegram-cli cache right after downloading
   # Effectively turns copy_media into move_media
@@ -91,16 +91,16 @@
   tg_host: 'localhost'
 
   # Should match the port passed to telegram-cli with the -P option
-  tg_port: 9009
+  tg_port: 9008
 
   # Number of messages to request in one chunk
-  chunk_size: 100
+  chunk_size: 1
 
   # Time in seconds to wait between requesting chunks
-  chunk_delay: 1.0
+  chunk_delay: 0.5
 
   # Time in seconds to wait before considering a request stuck (0 = infinite)
-  chunk_timeout: 10
+  chunk_timeout: 30
 
   # Number of times to retry getting one chunk
   chunk_retry: 3
